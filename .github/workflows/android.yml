@@ -26,7 +26,8 @@ jobs:
 
       - name: Resumen de errores
         if: failure()
-        run: grep -E "^e: |What went wrong|^> " build.log | head -80 || true
+        run: |
+          grep -E "^e: |What went wrong|^> " build.log | head -80 || true
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
