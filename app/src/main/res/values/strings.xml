@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrabaFondo</string>
+    <string name="channel_recording_name">Grabación en curso</string>
+    <string name="channel_recording_desc">Notificación fija mientras la cámara está grabando.</string>
+    <string name="channel_alerts_name">Avisos de grabación</string>
+    <string name="channel_alerts_desc">Avisos cuando la grabación se detiene sola (poco espacio, batería baja, errores).</string>
+</resources>
