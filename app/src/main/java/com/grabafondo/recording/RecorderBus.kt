@@ -49,7 +49,27 @@ object RecorderBus {
     /** Superficie de la vista previa de la Activity mientras está visible (null si no hay). */
     val previewSurface: StateFlow<Preview.SurfaceProvider?> = _previewSurface.asStateFlow()
 
+    private val _appVisible = MutableStateFlow(false)
+    /** true mientras la pantalla de GrabaFondo está visible (las ventanas flotantes se ocultan). */
+    val appVisible: StateFlow<Boolean> = _appVisible.asStateFlow()
+
+    private val _quickStart = MutableStateFlow(false)
+    /** Pedido desde el botón de ajustes rápidos: abrir la app y empezar a grabar. */
+    val quickStart: StateFlow<Boolean> = _quickStart.asStateFlow()
+
     fun update(transform: (State) -> State) = _state.update(transform)
+
+    fun setAppVisible(visible: Boolean) {
+        _appVisible.value = visible
+    }
+
+    fun requestQuickStart() {
+        _quickStart.value = true
+    }
+
+    fun consumeQuickStart() {
+        _quickStart.value = false
+    }
 
     fun notifyRecordingsChanged() = _recordingsVersion.update { it + 1 }
 

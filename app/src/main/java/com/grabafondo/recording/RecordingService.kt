@@ -46,6 +46,7 @@ import com.grabafondo.data.Resolution
 import com.grabafondo.data.SettingsRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -70,6 +71,8 @@ class RecordingService : LifecycleService() {
     companion object {
         const val ACTION_START = "com.grabafondo.action.START"
         const val ACTION_STOP = "com.grabafondo.action.STOP"
+        const val ACTION_TOGGLE_INDICATOR = "com.grabafondo.action.TOGGLE_INDICATOR"
+        const val ACTION_TOGGLE_PREVIEW = "com.grabafondo.action.TOGGLE_PREVIEW"
 
         private const val TAG = "GrabaFondo"
         private const val NO_TOKEN = -1
@@ -150,6 +153,9 @@ class RecordingService : LifecycleService() {
     private var callCandidate = false
     private var callCandidateSince = 0L
 
+    private var overlays: OverlayController? = null
+    private var overlayJob: Job? = null
+
     override fun onCreate() {
         super.onCreate()
         // La Activity publica su superficie de vista previa al estar visible y la retira al salir.
@@ -163,6 +169,8 @@ class RecordingService : LifecycleService() {
         when (intent?.action) {
             ACTION_START -> handleStart()
             ACTION_STOP -> if (sessionActive) finishSession(null) else stopSelf()
+            ACTION_TOGGLE_INDICATOR -> toggleOverlay(indicator = true)
+            ACTION_TOGGLE_PREVIEW -> toggleOverlay(indicator = false)
             else -> if (!sessionActive) stopSelf()
         }
         // Si el sistema mata el servicio no se reinicia solo: Android no deja abrir la cámara
@@ -176,6 +184,7 @@ class RecordingService : LifecycleService() {
             activeRecording?.stop()
             activeRecording = null
             orientationListener?.disable()
+            releaseOverlays()
             releaseWakeLock()
             settingsRepo.sessionActive = false
             RecorderBus.update {
@@ -186,6 +195,7 @@ class RecordingService : LifecycleService() {
                 )
             }
             RecorderBus.notifyRecordingsChanged()
+            RecordTileService.requestUpdate(this)
         }
         super.onDestroy()
     }
@@ -242,6 +252,8 @@ class RecordingService : LifecycleService() {
         startOrientationListener()
         updateResources()
         startMonitor()
+        startOverlays()
+        RecordTileService.requestUpdate(this)
 
         lifecycleScope.launch {
             val provider = try {
@@ -316,6 +328,7 @@ class RecordingService : LifecycleService() {
         preview = null
         orientationListener?.disable()
         orientationListener = null
+        releaseOverlays()
         releaseWakeLock()
         settingsRepo.sessionActive = false
         sessionActive = false
@@ -333,7 +346,61 @@ class RecordingService : LifecycleService() {
         RecorderBus.notifyRecordingsChanged()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         if (reason != null) RecordingNotifications.showStopped(this, reason)
+        RecordTileService.requestUpdate(this)
         stopSelf()
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Luz roja y ventanita flotantes
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * Las ventanas flotantes solo aparecen fuera de la app (dentro ya se ve el estado) y según
+     * los ajustes, que se pueden cambiar en cualquier momento desde la app o la notificación.
+     */
+    private fun startOverlays() {
+        overlayJob?.cancel()
+        val controller = overlays ?: OverlayController(
+            context = this,
+            onStopRequested = { finishSession(null) },
+            onHideIndicator = { settingsRepo.update { it.copy(showIndicator = false) } },
+            onHidePreview = { settingsRepo.update { it.copy(showFloatingPreview = false) } },
+        ).also { overlays = it }
+        overlayJob = lifecycleScope.launch {
+            combine(settingsRepo.settings, RecorderBus.appVisible) { current, appVisible -> current to appVisible }
+                .collect { (current, appVisible) ->
+                    if (!sessionActive || stopRequested) return@collect
+                    controller.update(
+                        showIndicator = current.showIndicator && !appVisible,
+                        showPreview = current.showFloatingPreview && !appVisible,
+                        sessionStartMs = RecorderBus.state.value.sessionStartMs,
+                    )
+                    refreshNotification()
+                }
+        }
+    }
+
+    private fun releaseOverlays() {
+        overlayJob?.cancel()
+        overlayJob = null
+        overlays?.release()
+    }
+
+    private fun toggleOverlay(indicator: Boolean) {
+        if (!sessionActive) {
+            stopSelf()
+            return
+        }
+        settingsRepo.update {
+            if (indicator) it.copy(showIndicator = !it.showIndicator)
+            else it.copy(showFloatingPreview = !it.showFloatingPreview)
+        }
+        if (overlays?.canDraw() == false) {
+            RecorderBus.update {
+                it.copy(message = "Para ver la luz roja o la ventanita, abre GrabaFondo y da el permiso \"Mostrar sobre otras apps\".")
+            }
+            refreshNotification()
+        }
     }
 
     // ---------------------------------------------------------------------------------------
@@ -866,11 +933,16 @@ class RecordingService : LifecycleService() {
         return parts.takeIf { it.isNotEmpty() }?.joinToString(" ")
     }
 
-    private fun buildNotification() = RecordingNotifications.buildOngoing(
-        this,
-        RecorderBus.state.value,
-        "${settings.summary} · partes de ${settings.segmentMinutes} min",
-    )
+    private fun buildNotification(): android.app.Notification {
+        val live = settingsRepo.settings.value
+        return RecordingNotifications.buildOngoing(
+            this,
+            RecorderBus.state.value,
+            "${settings.summary} · partes de ${settings.segmentMinutes} min",
+            indicatorOn = live.showIndicator,
+            floatingPreviewOn = live.showFloatingPreview,
+        )
+    }
 
     private fun refreshNotification() {
         if (sessionActive && !stopCompleted) {

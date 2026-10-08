@@ -39,7 +39,13 @@ object RecordingNotifications {
         manager.createNotificationChannels(listOf(recording, alerts))
     }
 
-    fun buildOngoing(context: Context, state: RecorderBus.State, settingsSummary: String): Notification {
+    fun buildOngoing(
+        context: Context,
+        state: RecorderBus.State,
+        settingsSummary: String,
+        indicatorOn: Boolean,
+        floatingPreviewOn: Boolean,
+    ): Notification {
         val title = when (state.phase) {
             RecorderBus.Phase.STARTING -> "Iniciando grabación…"
             RecorderBus.Phase.RECORDING -> "Grabando · parte ${state.segmentIndex}"
@@ -75,6 +81,16 @@ object RecordingNotifications {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(openAppIntent(context))
             .addAction(R.drawable.ic_stop, "Detener", stopIntent(context))
+            .addAction(
+                R.drawable.ic_stat_record,
+                if (indicatorOn) "Ocultar luz" else "Mostrar luz",
+                serviceIntent(context, RecordingService.ACTION_TOGGLE_INDICATOR, 2),
+            )
+            .addAction(
+                R.drawable.ic_stat_record,
+                if (floatingPreviewOn) "Ocultar cámara" else "Ver cámara",
+                serviceIntent(context, RecordingService.ACTION_TOGGLE_PREVIEW, 3),
+            )
             .build()
     }
 
@@ -107,10 +123,14 @@ object RecordingNotifications {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    private fun stopIntent(context: Context): PendingIntent = PendingIntent.getService(
-        context,
-        1,
-        Intent(context, RecordingService::class.java).setAction(RecordingService.ACTION_STOP),
-        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-    )
+    private fun stopIntent(context: Context): PendingIntent =
+        serviceIntent(context, RecordingService.ACTION_STOP, 1)
+
+    private fun serviceIntent(context: Context, action: String, requestCode: Int): PendingIntent =
+        PendingIntent.getService(
+            context,
+            requestCode,
+            Intent(context, RecordingService::class.java).setAction(action),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
 }

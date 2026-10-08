@@ -2,7 +2,15 @@ name: Compilar APK
 
 on:
   push:
+    branches: ["**"]
   workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: compilar-apk
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -35,3 +43,17 @@ jobs:
           name: GrabaFondo-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # Enlace fijo para descargar desde el celular:
+      # https://github.com/<usuario>/<repo>/releases/latest/download/GrabaFondo.apk
+      - name: Publicar en Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk GrabaFondo.apk
+          gh release delete grabafondo --yes --cleanup-tag || true
+          gh release create grabafondo GrabaFondo.apk \
+            --target "${{ github.sha }}" \
+            --title "GrabaFondo (versión 1.${{ github.run_number }})" \
+            --notes "Desde el celular: toca GrabaFondo.apk para descargarla y luego ábrela para instalar." \
+            --latest

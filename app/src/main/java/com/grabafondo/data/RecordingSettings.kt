@@ -22,6 +22,10 @@ data class RecordingSettings(
     val segmentMinutes: Int = 10,
     val camera: CameraFacing = CameraFacing.FRONT,
     val showPreview: Boolean = true,
+    /** Luz roja flotante encima de otras apps mientras se graba. */
+    val showIndicator: Boolean = true,
+    /** Ventanita flotante con la cámara encima de otras apps mientras se graba. */
+    val showFloatingPreview: Boolean = false,
 ) {
     val videoBitrateBps: Int get() = videoBitrateMbps * 1_000_000
 
@@ -75,6 +79,8 @@ class SettingsRepository private constructor(context: Context) {
             segmentMinutes = prefs.getInt(KEY_SEGMENT, defaults.segmentMinutes),
             camera = enumOrDefault(prefs.getString(KEY_CAMERA, null), defaults.camera),
             showPreview = prefs.getBoolean(KEY_PREVIEW, defaults.showPreview),
+            showIndicator = prefs.getBoolean(KEY_INDICATOR, defaults.showIndicator),
+            showFloatingPreview = prefs.getBoolean(KEY_FLOATING_PREVIEW, defaults.showFloatingPreview),
         )
     }
 
@@ -86,6 +92,8 @@ class SettingsRepository private constructor(context: Context) {
             .putInt(KEY_SEGMENT, settings.segmentMinutes)
             .putString(KEY_CAMERA, settings.camera.name)
             .putBoolean(KEY_PREVIEW, settings.showPreview)
+            .putBoolean(KEY_INDICATOR, settings.showIndicator)
+            .putBoolean(KEY_FLOATING_PREVIEW, settings.showFloatingPreview)
             .apply()
     }
 
@@ -99,6 +107,8 @@ class SettingsRepository private constructor(context: Context) {
         private const val KEY_SEGMENT = "segment_minutes"
         private const val KEY_CAMERA = "camera"
         private const val KEY_PREVIEW = "preview"
+        private const val KEY_INDICATOR = "indicator"
+        private const val KEY_FLOATING_PREVIEW = "floating_preview"
         private const val KEY_SESSION_ACTIVE = "session_active"
 
         @Volatile

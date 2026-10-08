@@ -44,6 +44,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -60,7 +61,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.withResumed
 import com.grabafondo.data.CameraFacing
 import com.grabafondo.data.DeviceStatus
 import com.grabafondo.data.RecordingSettings
@@ -123,6 +126,19 @@ fun RecordScreen(vm: MainViewModel, snackbar: SnackbarHostState, modifier: Modif
         if (needed.isEmpty()) launchRecording() else permissionLauncher.launch(needed.toTypedArray())
     }
 
+    // Botón de Ajustes rápidos: la app se abre y empieza a grabar sola.
+    val quickStart by RecorderBus.quickStart.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(quickStart) {
+        if (quickStart) {
+            RecorderBus.consumeQuickStart()
+            // Espera a que la app esté del todo en primer plano antes de abrir la cámara.
+            lifecycleOwner.lifecycle.withResumed {
+                if (!RecorderBus.state.value.isActive) onStartClicked()
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -166,6 +182,17 @@ fun RecordScreen(vm: MainViewModel, snackbar: SnackbarHostState, modifier: Modif
             )
         }
 
+        if ((settings.showIndicator || settings.showFloatingPreview) && !device.canDrawOverlays) {
+            NoticeCard(
+                icon = Icons.Filled.Warning,
+                title = "Falta un permiso para la luz roja y la ventanita",
+                body = "Para que se vean encima de otras apps, activa \"Mostrar sobre otras apps\" " +
+                    "(en Honor puede llamarse \"Ventanas flotantes\") para GrabaFondo.",
+                actionLabel = "Dar permiso",
+                onAction = { SystemIntents.openOverlayPermission(context) },
+            )
+        }
+
         StatusCard(state, settings)
 
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -203,10 +230,21 @@ fun RecordScreen(vm: MainViewModel, snackbar: SnackbarHostState, modifier: Modif
             }
         }
 
+        StopHelpCard(
+            onAddTile = {
+                SystemIntents.requestAddQuickTile(context) { message ->
+                    scope.launch { snackbar.showSnackbar(message, duration = SnackbarDuration.Long) }
+                }
+            },
+        )
+
         SettingsCard(
             settings = settings,
             enabled = !state.isActive,
             onChange = vm::updateSettings,
+            onOverlayToggled = { turnedOn ->
+                if (turnedOn && !device.canDrawOverlays) SystemIntents.openOverlayPermission(context)
+            },
         )
 
         BatteryOptimizationCard(
@@ -363,6 +401,7 @@ private fun SettingsCard(
     settings: RecordingSettings,
     enabled: Boolean,
     onChange: ((RecordingSettings) -> RecordingSettings) -> Unit,
+    onOverlayToggled: (Boolean) -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -443,6 +482,51 @@ private fun SettingsCard(
                 enabled = true,
                 onCheckedChange = { checked -> onChange { it.copy(showPreview = checked) } },
             )
+
+            HorizontalDivider()
+            Text(
+                "Fuera de la app (se pueden cambiar mientras grabas, también desde la notificación)",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            SwitchRow(
+                title = "Luz roja en pantalla",
+                subtitle = "Puntito rojo flotante encima de otras apps mientras grabas. " +
+                    "Arrástralo a donde quieras; tócalo para ver el tiempo, Detener u Ocultar.",
+                checked = settings.showIndicator,
+                enabled = true,
+                onCheckedChange = { checked ->
+                    onChange { it.copy(showIndicator = checked) }
+                    onOverlayToggled(checked)
+                },
+            )
+            SwitchRow(
+                title = "Ventanita de cámara",
+                subtitle = "Ventanita flotante con lo que estás grabando. Arrástrala; tócala para " +
+                    "agrandarla o achicarla; la ✕ la oculta.",
+                checked = settings.showFloatingPreview,
+                enabled = true,
+                onCheckedChange = { checked ->
+                    onChange { it.copy(showFloatingPreview = checked) }
+                    onOverlayToggled(checked)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun StopHelpCard(onAddTile: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Cómo detener la grabación", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "• Botón Detener de esta pantalla.\n" +
+                    "• Baja la persiana de notificaciones y toca Detener.\n" +
+                    "• Toca la luz roja flotante y luego Detener dos veces (así no se para por error).\n" +
+                    "• Botón rápido GrabaFondo en los Ajustes rápidos: un toque graba, otro detiene.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            FilledTonalButton(onClick = onAddTile) { Text("Añadir botón rápido") }
         }
     }
 }

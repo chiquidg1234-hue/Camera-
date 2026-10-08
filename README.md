@@ -7,6 +7,31 @@ otras apps. La cámara sigue grabando en segundo plano dentro de un *foreground 
 - minSdk 29 (Android 10), targetSdk/compileSdk 35 (Android 15)
 - Vídeo MP4 en segmentos (10 min por defecto) en `Movies/GrabaFondo` vía MediaStore
 
+## Descargar e instalar (sin cable, desde el celular)
+
+Enlace directo a la última versión (no hace falta iniciar sesión ni descomprimir nada):
+
+**https://github.com/chiquidg1234-hue/Camera-/releases/latest/download/GrabaFondo.apk**
+
+Ábrelo en Chrome desde el celular → descarga `GrabaFondo.apk` → ábrelo → permite
+"Instalar apps desconocidas" → Instalar. Cada cambio subido publica una versión nueva en
+*Releases* y se instala encima de la anterior (misma firma).
+
+> Ojo: el botón verde *Code → Download ZIP* de GitHub descarga el **código fuente**, no la app.
+
+## Luz roja, ventanita y cómo detener
+
+- **Luz roja en pantalla** (por defecto activada): puntito rojo flotante encima de otras apps
+  mientras grabas. Se arrastra; al tocarlo muestra el tiempo, **Detener** (dos toques, para no
+  pararla por error) y **Ocultar**.
+- **Ventanita de cámara** (por defecto desactivada): ventanita flotante con lo que se graba. Se
+  arrastra, un toque cambia el tamaño y la ✕ la oculta.
+- Las dos se activan/desactivan en *Ajustes* de la app o desde la notificación (*Mostrar/Ocultar
+  luz*, *Ver/Ocultar cámara*), también mientras grabas. Necesitan el permiso *Mostrar sobre otras
+  apps*; solo aparecen cuando no estás dentro de GrabaFondo.
+- **Detener:** botón de la app, botón *Detener* de la notificación, la luz roja, o el **botón
+  rápido "GrabaFondo"** de los Ajustes rápidos (un toque abre la app y graba; otro toque detiene).
+
 ## Arquitectura
 
 ```
@@ -28,6 +53,8 @@ recording/RecorderBus (StateFlow en proceso: fase, parte, avisos, superficie de 
 | `ui/RecordScreen.kt` | Pantalla principal: botón Iniciar/Detener, estado, espacio, vista previa, ajustes, guía de batería. |
 | `ui/CameraPreview.kt` | Vista previa: propia de la Activity sin grabar; prestada al servicio mientras graba. |
 | `ui/RecordingsScreen.kt` | Lista de grabaciones con miniatura, reproductor integrado, compartir y borrar. |
+| `recording/OverlayController.kt` | Luz roja y ventanita de cámara flotantes (encima de otras apps). |
+| `recording/RecordTileService.kt` | Botón de Ajustes rápidos para grabar/detener. |
 
 ### Decisiones clave
 

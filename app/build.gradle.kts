@@ -13,8 +13,21 @@ android {
         applicationId = "com.grabafondo"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // En GitHub Actions cada compilación sube el número de versión para poder actualizar encima.
+        val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = buildNumber
+        versionName = "1.$buildNumber"
+    }
+
+    signingConfigs {
+        // Clave fija (no secreta) para que cada APK nuevo se pueda instalar encima del anterior.
+        // Si algún día publicas la app en Play Store, crea una clave propia y privada.
+        getByName("debug") {
+            storeFile = file("grabafondo-debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {

@@ -1,6 +1,7 @@
 package com.grabafondo.ui
 
 import android.app.Application
+import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,6 +25,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val battery: DeviceStatus.Battery = DeviceStatus.Battery(-1, false),
         val ignoringBatteryOptimizations: Boolean = true,
         val notificationsEnabled: Boolean = true,
+        val canDrawOverlays: Boolean = true,
     )
 
     sealed interface StartCheck {
@@ -70,6 +72,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             battery = DeviceStatus.battery(context),
             ignoringBatteryOptimizations = DeviceStatus.isIgnoringBatteryOptimizations(context),
             notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled(),
+            canDrawOverlays = Settings.canDrawOverlays(context),
         )
     }
 
