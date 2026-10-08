@@ -98,7 +98,7 @@ class RecordingService : LifecycleService() {
     }
 
     private val settingsRepo by lazy { SettingsRepository.get(this) }
-    private val mainExecutor by lazy { ContextCompat.getMainExecutor(this) }
+    private val callbackExecutor by lazy { ContextCompat.getMainExecutor(this) }
     private val audioManager by lazy { getSystemService(AudioManager::class.java) }
 
     /** Copia de los ajustes al iniciar: cambiar ajustes durante la grabación no afecta a la sesión. */
@@ -349,7 +349,7 @@ class RecordingService : LifecycleService() {
                 } catch (e: Exception) {
                     cont.resumeWithException(e)
                 }
-            }, mainExecutor)
+            }, callbackExecutor)
         }
 
     /** (Re)vincula VideoCapture al ciclo de vida del servicio. Desvincula también la vista previa de la Activity. */
@@ -499,7 +499,7 @@ class RecordingService : LifecycleService() {
         return try {
             // Si el segmento anterior aún se está cerrando, el Recorder deja este en cola y lo
             // arranca en cuanto termina, así el hueco entre partes es mínimo.
-            activeRecording = pending.start(mainExecutor) { event -> onRecordEvent(token, event) }
+            activeRecording = pending.start(callbackExecutor) { event -> onRecordEvent(token, event) }
             currentToken = token
             pendingFinalizations++
             segmentNumber = number

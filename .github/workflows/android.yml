@@ -21,7 +21,12 @@ jobs:
       - name: Compilar APK de depuración
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Resumen de errores
+        if: failure()
+        run: grep -E "^e: |What went wrong|^> " build.log | head -80 || true
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
